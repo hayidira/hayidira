@@ -1,0 +1,103 @@
+import telebot, aiohttp, asyncio
+
+bot = telebot.TeleBot("7522915026:AAE_m5SMCgxF7MvIy9ItJ4tpCqhGp3r5LTA")
+
+class Buttons:
+    @staticmethod
+    def start(language):
+        if language == "ar":
+            gen = telebot.types.InlineKeyboardButton(text ="( توليد صورة )",callback_data = "gen")
+            web = telebot.types.InlineKeyboardButton(text="( جيتهاب )", web_app=telebot.types.WebAppInfo(url="https://github.com/is-L7N"))
+            programmer = telebot.types.InlineKeyboardButton(text ="( المبرمج ) ", url="t.me/g_4_q")
+            channel = telebot.types.InlineKeyboardButton(text ="( قناتي ) ",url="t.me/ToPython")
+        else:
+            gen = telebot.types.InlineKeyboardButton(text ="( Generation Image )",callback_data = "gen")
+            programmer = telebot.types.InlineKeyboardButton(text ="( The Programmer ) ", url="t.me/g_4_q")
+            channel = telebot.types.InlineKeyboardButton(text ="( Channel ) ",url="t.me/ToPython")
+            web = telebot.types.InlineKeyboardButton(text="( GitHub )", web_app=telebot.types.WebAppInfo(url="https://github.com/is-L7N"))
+        
+        markup = telebot.types.InlineKeyboardMarkup(row_width=4)
+        markup.add(gen)
+        markup.add(web)
+        markup.add(programmer,channel)
+        return markup
+    @staticmethod
+    def again(language):
+        if language == "ar":
+            again = telebot.types.InlineKeyboardButton(text ="( توليد مرة اخرى )",callback_data = "gen")
+        else:
+            again = telebot.types.InlineKeyboardButton(text ="( Generate Again )",callback_data = "gen")
+        markup = telebot.types.InlineKeyboardMarkup(row_width=4)
+        markup.add(again)
+        return markup
+
+class Network:
+    @staticmethod
+    async def gen_img(text):
+        url = "https://llmhacker-realtime-flux-modified-flux-schnell-for-ja-p.hf.space/run/predict"
+        headers = {
+            "accept": "*/*",
+            "content-type": "application/json",
+            "origin": "https://llmhacker-realtime-flux-modified-flux-schnell-for-ja-p.hf.space",
+            "referer": "https://llmhacker-realtime-flux-modified-flux-schnell-for-ja-p.hf.space/",
+            "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36",
+        }
+        data = {
+            "data": [text, 100, 1920, 1080, True, 1],
+            "fn_index": 3,
+            "trigger_id": 10,
+        }    
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=data) as res:
+                    response = await res.json()
+                    image = response['data'][0]['url']
+                    size = response['data'][0]['size']
+                    time = response['data'][2]           
+                    return image, size, time
+        except Exception as e:
+            return None, None, None
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    try:
+        language = message.from_user.language_code
+        if language == "ar":
+            bot.reply_to(message, "- اهلا بك في بوت توليد صور عن طريق نص بالذكاء الاصطناعي !",reply_markup=Buttons.start(language=language))
+        else:
+            bot.reply_to(message, "- Welcome To Bot Generating images with Ai",reply_markup=Buttons.start(language=language))
+    except:
+        pass
+
+@bot.callback_query_handler(func=lambda call: True)
+def Func1(call):
+    try:
+        message = call.message
+        language = call.from_user.language_code
+        if call.data == "gen":
+            if language == "ar":
+                text = "- قم بأرسال نص الان لتحويله الى صورة !:"
+            else:
+                text = "- Send Text to convert a Image !:"
+            bot.send_message(message.chat.id,text=text)
+            bot.register_next_step_handler(message, send_img)
+    
+    except Exception as e:
+        bot.send_message(message.chat.id,text=f"erorr : {e}")
+        
+def send_img(message):
+    async def asy():
+        try:
+            language = message.from_user.language_code
+            msg = bot.send_message(message.chat.id,text="⏳")      
+            image, size, time = await Network.gen_img(message.text)     
+            bot.delete_message(message.chat.id, msg.message_id)
+            
+            bot.send_photo(message.chat.id, image,caption=f"Time : `{time.split('Latency:')[1]}`\nSize : {size}",parse_mode="Markdown",reply_markup=Buttons.again(language=language))
+                  
+        except Exception as e:
+            bot.send_message(message.chat.id,text=f"erorr : {e}")
+    asyncio.run(asy())
+    
+if __name__ == '__main__':
+    bot.polling(none_stop=True)
